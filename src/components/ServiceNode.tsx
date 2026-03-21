@@ -3,6 +3,7 @@ import { Handle, Position } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Tooltip from '@mui/material/Tooltip';
 import type { ServiceStatus } from '../types';
 
 export interface ServiceNodeData extends Record<string, unknown> {
@@ -11,6 +12,10 @@ export interface ServiceNodeData extends Record<string, unknown> {
 }
 
 export type ServiceNodeType = Node<ServiceNodeData, 'serviceNode'>;
+
+// Must match NODE_WIDTH in DependencyGraph.tsx so dagre allocates the right space
+export const NODE_WIDTH = 180;
+export const NODE_HEIGHT = 64;
 
 const statusBorderColor: Record<ServiceStatus, string> = {
   Healthy: '#4caf50',
@@ -31,29 +36,46 @@ function ServiceNode({ data }: NodeProps<ServiceNodeType>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} />
-      <Box
-        sx={{
-          px: 2,
-          py: 1,
-          border: `2px solid ${borderColor}`,
-          borderRadius: 2,
-          background: '#fff',
-          minWidth: 140,
-          textAlign: 'center',
-        }}
-      >
-        <Typography variant="body2" fontWeight="bold">
-          {data.label}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{ color: statusTextColor[data.status] }}
+      <Handle type="target" position={Position.Left} />
+      <Tooltip title={data.label} placement="top">
+        <Box
+          sx={{
+            px: 1.5,
+            py: 1,
+            border: `2px solid ${borderColor}`,
+            borderRadius: 2,
+            background: '#fff',
+            width: NODE_WIDTH,
+            height: NODE_HEIGHT,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'hidden',
+          }}
         >
-          {data.status}
-        </Typography>
-      </Box>
-      <Handle type="source" position={Position.Bottom} />
+          <Typography
+            variant="body2"
+            fontWeight="bold"
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              textAlign: 'center',
+            }}
+          >
+            {data.label}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{ color: statusTextColor[data.status] }}
+          >
+            {data.status}
+          </Typography>
+        </Box>
+      </Tooltip>
+      <Handle type="source" position={Position.Right} />
     </>
   );
 }

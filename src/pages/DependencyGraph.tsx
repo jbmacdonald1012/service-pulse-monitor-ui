@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { ReactFlow, Background, Controls, MiniMap } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, MarkerType } from '@xyflow/react';
 import type { Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import dagre from '@dagrejs/dagre';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import ServiceNode from '../components/ServiceNode';
-import type { ServiceNodeData, ServiceNodeType } from '../components/ServiceNode';
+import type { ServiceNodeData } from '../components/ServiceNode';
+import { NODE_WIDTH, NODE_HEIGHT } from '../components/ServiceNode';
 import { fetchAllServicesWithHealth, fetchDependencyGraph } from '../api/monitorApi';
 import type {
   ServiceSummary,
@@ -18,6 +20,8 @@ import type {
 // nodeTypes must be at module scope — defining inside the component causes
 // React Flow to re-register on every render, breaking drag behavior.
 const nodeTypes = { serviceNode: ServiceNode };
+
+// Re-exported from ServiceNode so dagre and the rendered node use the same dimensions
 
 interface DependencyGraphProps {
   statusEvents: StatusChangedEvent[];
@@ -46,6 +50,39 @@ function detectCycle(services: ServiceSummary[], deps: DependencyEdge[]): boolea
     if (!visited.has(svc.serviceId) && dfs(svc.serviceId)) return true;
   }
   return false;
+}
+
+/**
+ * Computes node positions using dagre's hierarchical layout algorithm.
+ * Callers are placed above their dependencies (top-to-bottom rank direction).
+ */
+function computeLayout(
+  services: ServiceSummary[],
+  deps: DependencyEdge[],
+): Map<number, { x: number; y: number }> {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: 'LR', ranksep: 100, nodesep: 60 });
+  g.setDefaultEdgeLabel(() => ({}));
+
+  for (const svc of services) {
+    g.setNode(String(svc.serviceId), { width: NODE_WIDTH, height: NODE_HEIGHT });
+  }
+  for (const dep of deps) {
+    g.setEdge(String(dep.sourceId), String(dep.targetId));
+  }
+
+  dagre.layout(g);
+
+  const positions = new Map<number, { x: number; y: number }>();
+  for (const svc of services) {
+    const node = g.node(String(svc.serviceId));
+    // dagre gives center coordinates; React Flow needs top-left corner
+    positions.set(svc.serviceId, {
+      x: node.x - NODE_WIDTH / 2,
+      y: node.y - NODE_HEIGHT / 2,
+    });
+  }
+  return positions;
 }
 
 export default function DependencyGraph({ statusEvents }: DependencyGraphProps) {
@@ -95,16 +132,18 @@ export default function DependencyGraph({ statusEvents }: DependencyGraphProps) 
     });
   }, [statusEvents]);
 
-  const nodes = useMemo<Node<ServiceNodeData>[]>(
-    () =>
-      services.map((svc, i) => ({
+  const nodes = useMemo<Node<ServiceNodeData>[]>(() => {
+    const positions = computeLayout(services, depEdges);
+    return services.map((svc) => {
+      const pos = positions.get(svc.serviceId) ?? { x: 0, y: 0 };
+      return {
         id: String(svc.serviceId),
         type: 'serviceNode' as const,
-        position: { x: (i % 3) * 240, y: Math.floor(i / 3) * 160 },
+        position: pos,
         data: { label: svc.serviceName, status: svc.currentStatus },
-      })),
-    [services],
-  );
+      };
+    });
+  }, [services, depEdges]);
 
   const flowEdges = useMemo<Edge[]>(
     () =>
@@ -112,6 +151,8 @@ export default function DependencyGraph({ statusEvents }: DependencyGraphProps) 
         id: `${dep.sourceId}-${dep.targetId}`,
         source: String(dep.sourceId),
         target: String(dep.targetId),
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { strokeWidth: 2 },
       })),
     [depEdges],
   );
@@ -142,12 +183,19 @@ export default function DependencyGraph({ statusEvents }: DependencyGraphProps) 
         </Alert>
       )}
 
-      <Box sx={{ height: 'calc(100vh - 200px)', border: '1px solid #e0e0e0', borderRadius: 2 }}>
+      <Box
+        sx={{
+          height: 'calc(100vh - 200px)',
+          border: '1px solid #e0e0e0',
+          borderRadius: 2,
+        }}
+      >
         <ReactFlow
           nodes={nodes}
           edges={flowEdges}
           nodeTypes={nodeTypes}
           fitView
+          fitViewOptions={{ padding: 0.2 }}
         >
           <Background />
           <Controls />
