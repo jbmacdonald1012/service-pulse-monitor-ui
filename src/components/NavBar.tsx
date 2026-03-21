@@ -39,6 +39,9 @@ export default function NavBar({ connectionState }: NavBarProps) {
         <Button color="inherit" component={Link} to="/alerts">
           Alerts
         </Button>
+        <Button color="inherit" component={Link} to="/dependencies">
+          Dependencies
+        </Button>
 
         <Box sx={{ flexGrow: 1 }} />
 
