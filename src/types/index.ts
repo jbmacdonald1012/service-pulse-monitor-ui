@@ -74,3 +74,13 @@ export interface AlertEvent {
   message: string;
   triggeredAt: string;
 }
+
+// ─── Dependency graph shapes ──────────────────────────────────────────────────
+
+export interface DependencyEdge {
+  sourceId: number;
+  sourceName: string;
+  targetId: number;
+  targetName: string;
+  discoveredAt: string; // backend field is discoveredAt, NOT detectedAt
+}

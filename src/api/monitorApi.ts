@@ -5,6 +5,7 @@ import type {
   ServiceHealthSummaryDto,
   ServiceSummary,
   HealthCheckDto,
+  DependencyEdge,
 } from '../types';
 
 const api = axios.create({
@@ -38,6 +39,11 @@ export async function fetchHealthChecks(
   const { data } = await api.get<HealthCheckDto[]>(
     `/api/services/${serviceId}/healthchecks?limit=${limit}`,
   );
+  return data;
+}
+
+export async function fetchDependencyGraph(): Promise<DependencyEdge[]> {
+  const { data } = await api.get<DependencyEdge[]>('/api/dependencies');
   return data;
 }
 
