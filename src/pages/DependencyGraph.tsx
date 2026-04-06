@@ -12,6 +12,7 @@ import type { ServiceNodeData } from '../components/ServiceNode';
 import { NODE_WIDTH, NODE_HEIGHT } from '../components/ServiceNode';
 import { fetchAllServicesWithHealth, fetchDependencyGraph } from '../api/monitorApi';
 import type {
+  DependencyDiscoveredEvent,
   ServiceSummary,
   StatusChangedEvent,
   DependencyEdge,
@@ -25,6 +26,7 @@ const nodeTypes = { serviceNode: ServiceNode };
 
 interface DependencyGraphProps {
   statusEvents: StatusChangedEvent[];
+  dependencyEvents: DependencyDiscoveredEvent[];
 }
 
 function detectCycle(services: ServiceSummary[], deps: DependencyEdge[]): boolean {
@@ -85,7 +87,7 @@ function computeLayout(
   return positions;
 }
 
-export default function DependencyGraph({ statusEvents }: DependencyGraphProps) {
+export default function DependencyGraph({ statusEvents, dependencyEvents }: DependencyGraphProps) {
   const [services, setServices] = useState<ServiceSummary[]>([]);
   const [depEdges, setDepEdges] = useState<DependencyEdge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +109,31 @@ export default function DependencyGraph({ statusEvents }: DependencyGraphProps) 
       )
       .finally(() => setLoading(false));
   }, []);
+
+  // Merge newly discovered dependency edges without a full re-fetch
+  const lastDepRef = useRef(0);
+  useEffect(() => {
+    const newEvents = dependencyEvents.slice(lastDepRef.current);
+    if (newEvents.length === 0) return;
+    lastDepRef.current = dependencyEvents.length;
+
+    const existing = new Set(depEdges.map((e) => `${e.sourceId}-${e.targetId}`));
+    const toAdd = newEvents
+      .filter((ev) => !existing.has(`${ev.sourceId}-${ev.targetId}`))
+      .map((ev) => ({
+        sourceId: ev.sourceId,
+        sourceName: ev.sourceName,
+        targetId: ev.targetId,
+        targetName: ev.targetName,
+        discoveredAt: ev.discoveredAt,
+      }));
+
+    if (toAdd.length === 0) return;
+
+    const nextEdges = [...depEdges, ...toAdd];
+    setDepEdges(nextEdges);
+    setHasCycle((prev) => prev || detectCycle(services, nextEdges));
+  }, [dependencyEvents, depEdges, services]);
 
   // Merge SignalR status updates — same processed-index ref pattern as Dashboard
   useEffect(() => {

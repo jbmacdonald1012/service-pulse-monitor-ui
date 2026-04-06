@@ -12,6 +12,7 @@ import Tooltip from '@mui/material/Tooltip';
 import GridViewRounded from '@mui/icons-material/GridViewRounded';
 import NotificationsRounded from '@mui/icons-material/NotificationsRounded';
 import HubRounded from '@mui/icons-material/HubRounded';
+import Badge from '@mui/material/Badge';
 import WifiRounded from '@mui/icons-material/WifiRounded';
 import WifiOffRounded from '@mui/icons-material/WifiOffRounded';
 import SyncRounded from '@mui/icons-material/SyncRounded';
@@ -19,6 +20,7 @@ import type { ConnectionState } from '../hooks/useSignalR';
 
 interface SidebarProps {
   connectionState: ConnectionState;
+  unresolvedAlertCount: number;
 }
 
 interface NavItem {
@@ -41,7 +43,7 @@ const connectionMeta: Record<ConnectionState, { icon: ReactElement; color: strin
   error:        { icon: <WifiOffRounded sx={{ fontSize: 14 }} />, color: '#ef4444', label: 'Error' },
 };
 
-export default function Sidebar({ connectionState }: SidebarProps) {
+export default function Sidebar({ connectionState, unresolvedAlertCount }: SidebarProps) {
   const location = useLocation();
   const conn = connectionMeta[connectionState];
 
@@ -120,7 +122,13 @@ export default function Sidebar({ connectionState }: SidebarProps) {
                 }}
               >
                 <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
-                  {item.icon}
+                  {item.to === '/alerts' ? (
+                    <Badge badgeContent={unresolvedAlertCount} color="error" max={99}>
+                      {item.icon}
+                    </Badge>
+                  ) : (
+                    item.icon
+                  )}
                 </ListItemIcon>
                 <ListItemText
                   primary={item.label}

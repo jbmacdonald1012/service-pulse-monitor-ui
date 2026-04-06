@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type {
+  AlertDto,
   PagedResult,
   ServiceDto,
   ServiceHealthSummaryDto,
@@ -40,6 +41,17 @@ export async function fetchHealthChecks(
     `/api/services/${serviceId}/healthchecks?limit=${limit}`,
   );
   return data;
+}
+
+export async function fetchActiveAlerts(): Promise<AlertDto[]> {
+  const { data } = await api.get<PagedResult<AlertDto>>(
+    '/api/alerts?isResolved=false&pageSize=100',
+  );
+  return data.items;
+}
+
+export async function acknowledgeAlert(alertId: number): Promise<void> {
+  await api.post(`/api/alerts/${alertId}/acknowledge`);
 }
 
 export async function fetchDependencyGraph(): Promise<DependencyEdge[]> {

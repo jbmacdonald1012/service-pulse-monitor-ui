@@ -75,6 +75,42 @@ export interface AlertEvent {
   triggeredAt: string;
 }
 
+export interface AlertDto {
+  alertId: number;
+  serviceId: number;
+  serviceName: string | null;
+  alertType: string;
+  triggeredAt: string;
+  isAcknowledged: boolean;
+  isResolved: boolean;
+  resolvedAt: string | null;
+  message: string | null;
+}
+
+export interface AlertsResolvedEvent {
+  serviceId: number;
+  serviceName: string;
+}
+
+export interface AlertAcknowledgedEvent {
+  alertId: number;
+}
+
+export interface ServiceRegisteredEvent {
+  serviceId: number;
+  serviceName: string;
+  baseUrl: string | null;
+  registeredAt: string;
+}
+
+export interface DependencyDiscoveredEvent {
+  sourceId: number;
+  sourceName: string;
+  targetId: number;
+  targetName: string;
+  discoveredAt: string;
+}
+
 // ─── Dependency graph shapes ──────────────────────────────────────────────────
 
 export interface DependencyEdge {

@@ -9,11 +9,12 @@ import Alert from '@mui/material/Alert';
 import Typography from '@mui/material/Typography';
 import SearchRounded from '@mui/icons-material/SearchRounded';
 import ServiceCard from '../components/ServiceCard';
-import { fetchAllServicesWithHealth } from '../api/monitorApi';
-import type { ServiceSummary, StatusChangedEvent } from '../types';
+import { fetchAllServicesWithHealth, fetchServiceHealth } from '../api/monitorApi';
+import type { ServiceRegisteredEvent, ServiceSummary, StatusChangedEvent } from '../types';
 
 interface DashboardProps {
   statusEvents: StatusChangedEvent[];
+  registrationEvents: ServiceRegisteredEvent[];
 }
 
 interface StatCard {
@@ -23,7 +24,7 @@ interface StatCard {
   bg: string;
 }
 
-export default function Dashboard({ statusEvents }: DashboardProps) {
+export default function Dashboard({ statusEvents, registrationEvents }: DashboardProps) {
   const navigate = useNavigate();
   const [services, setServices] = useState<ServiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,47 @@ export default function Dashboard({ statusEvents }: DashboardProps) {
       return Array.from(map.values());
     });
   }, [statusEvents]);
+
+  const lastRegistrationRef = useRef(0);
+  useEffect(() => {
+    const newEvents = registrationEvents.slice(lastRegistrationRef.current);
+    if (newEvents.length === 0) return;
+    lastRegistrationRef.current = registrationEvents.length;
+
+    void Promise.allSettled(
+      newEvents.map((ev) => fetchServiceHealth(ev.serviceId)),
+    ).then((results) => {
+      setServices((prev) => {
+        const map = new Map(prev.map((s) => [s.serviceId, s]));
+        newEvents.forEach((ev, i) => {
+          if (map.has(ev.serviceId)) return; // already tracked
+          const result = results[i];
+          map.set(ev.serviceId, result.status === 'fulfilled'
+            ? {
+                serviceId: ev.serviceId,
+                serviceName: ev.serviceName,
+                baseUrl: ev.baseUrl,
+                description: null,
+                currentStatus: result.value.currentStatus,
+                lastCheckAt: result.value.lastCheckAt,
+                uptimePercentage: result.value.uptimePercentage,
+                averageResponseTimeMs: result.value.averageResponseTimeMs,
+              }
+            : {
+                serviceId: ev.serviceId,
+                serviceName: ev.serviceName,
+                baseUrl: ev.baseUrl,
+                description: null,
+                currentStatus: 'Unknown' as const,
+                lastCheckAt: null,
+                uptimePercentage: 0,
+                averageResponseTimeMs: null,
+              });
+        });
+        return Array.from(map.values());
+      });
+    });
+  }, [registrationEvents]);
 
   const filteredServices = searchQuery.trim()
     ? services.filter((s) =>

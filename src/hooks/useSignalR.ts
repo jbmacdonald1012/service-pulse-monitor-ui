@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { HubConnectionBuilder } from '@microsoft/signalr';
-import type { AlertEvent, StatusChangedEvent } from '../types';
+import type { AlertAcknowledgedEvent, AlertEvent, AlertsResolvedEvent, DependencyDiscoveredEvent, ServiceRegisteredEvent, StatusChangedEvent } from '../types';
 
 export type ConnectionState =
   | 'connecting'
@@ -11,12 +11,20 @@ export type ConnectionState =
 export interface SignalRState {
   statusEvents: StatusChangedEvent[];
   alertEvents: AlertEvent[];
+  alertsResolvedEvents: AlertsResolvedEvent[];
+  alertAcknowledgedEvents: AlertAcknowledgedEvent[];
+  registrationEvents: ServiceRegisteredEvent[];
+  dependencyEvents: DependencyDiscoveredEvent[];
   connectionState: ConnectionState;
 }
 
 export function useSignalR(): SignalRState {
   const [statusEvents, setStatusEvents] = useState<StatusChangedEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEvent[]>([]);
+  const [alertsResolvedEvents, setAlertsResolvedEvents] = useState<AlertsResolvedEvent[]>([]);
+  const [alertAcknowledgedEvents, setAlertAcknowledgedEvents] = useState<AlertAcknowledgedEvent[]>([]);
+  const [registrationEvents, setRegistrationEvents] = useState<ServiceRegisteredEvent[]>([]);
+  const [dependencyEvents, setDependencyEvents] = useState<DependencyDiscoveredEvent[]>([]);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('connecting');
 
@@ -35,6 +43,22 @@ export function useSignalR(): SignalRState {
       setAlertEvents((prev) => [...prev.slice(-99), event]);
     });
 
+    connection.on('AlertsResolved', (event: AlertsResolvedEvent) => {
+      setAlertsResolvedEvents((prev) => [...prev, event]);
+    });
+
+    connection.on('AlertAcknowledged', (event: AlertAcknowledgedEvent) => {
+      setAlertAcknowledgedEvents((prev) => [...prev, event]);
+    });
+
+    connection.on('ServiceRegistered', (event: ServiceRegisteredEvent) => {
+      setRegistrationEvents((prev) => [...prev, event]);
+    });
+
+    connection.on('DependencyDiscovered', (event: DependencyDiscoveredEvent) => {
+      setDependencyEvents((prev) => [...prev, event]);
+    });
+
     connection.onreconnecting(() => setConnectionState('connecting'));
     connection.onreconnected(() => setConnectionState('connected'));
     connection.onclose(() => setConnectionState('disconnected'));
@@ -49,5 +73,5 @@ export function useSignalR(): SignalRState {
     };
   }, []);
 
-  return { statusEvents, alertEvents, connectionState };
+  return { statusEvents, alertEvents, alertsResolvedEvents, alertAcknowledgedEvents, registrationEvents, dependencyEvents, connectionState };
 }
