@@ -95,19 +95,32 @@ export default function DependencyGraph({ statusEvents, dependencyEvents }: Depe
   const [hasCycle, setHasCycle] = useState(false);
   const lastProcessedRef = useRef(0);
 
-  useEffect(() => {
-    void Promise.all([fetchAllServicesWithHealth(), fetchDependencyGraph()])
+  const syncGraph = () =>
+    Promise.all([fetchAllServicesWithHealth(), fetchDependencyGraph()])
       .then(([svcs, deps]) => {
         setServices(svcs);
-        setDepEdges(deps);
+        // Merge fetched edges with any edges SignalR discovered before the
+        // fetch completed. Using a functional update avoids stale closure issues.
+        setDepEdges((prev) => {
+          const fetchedKeys = new Set(deps.map((d) => `${d.sourceId}-${d.targetId}`));
+          const signalrOnly = prev.filter((e) => !fetchedKeys.has(`${e.sourceId}-${e.targetId}`));
+          return [...deps, ...signalrOnly];
+        });
         setHasCycle(detectCycle(svcs, deps));
       })
       .catch((err: unknown) =>
         setError(
           err instanceof Error ? err.message : 'Failed to load dependency graph',
         ),
-      )
-      .finally(() => setLoading(false));
+      );
+
+  useEffect(() => {
+    void syncGraph().finally(() => setLoading(false));
+
+    // Re-sync every 30 s as a backstop in case a SignalR event is missed.
+    const id = setInterval(() => void syncGraph(), 30_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Merge newly discovered dependency edges without a full re-fetch
